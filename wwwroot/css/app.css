@@ -1,0 +1,135 @@
+/* -- Base ------------------------------------------------------------------- */
+html, body {
+    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    background-color: #FFF8F1;
+    margin: 0;
+    padding: 0;
+}
+
+/* -- Main countdown clock --------------------------------------------------- */
+.main-timer-display {
+    font-size: clamp(3.5rem, 16vw, 5.5rem);
+    font-weight: 700;
+    font-family: 'Courier New', Courier, monospace;
+    color: #E65100;
+    line-height: 1.05;
+    letter-spacing: 0.04em;
+    margin: 0.25rem 0;
+}
+
+/* -- Per-item countdown ----------------------------------------------------- */
+.item-timer {
+    font-size: clamp(1.25rem, 5vw, 1.6rem);
+    font-weight: 700;
+    font-family: 'Courier New', Courier, monospace;
+    color: #E65100;
+    line-height: 1.1;
+}
+
+/* -- Meal-complete banner --------------------------------------------------- */
+.meal-complete-text {
+    font-size: clamp(1.3rem, 5vw, 1.8rem);
+    font-weight: 700;
+    color: #2E7D32;
+    margin: 0.75rem 0 0.25rem;
+    animation: completePulse 1.6s ease-in-out infinite;
+}
+
+/* -- Timer hero card -------------------------------------------------------- */
+.timer-hero-card {
+    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%) !important;
+}
+
+/* -- Food item cards -------------------------------------------------------- */
+.food-item-card {
+    border-left: 4px solid transparent;
+    transition: border-left-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.food-item-card.status-preparing {
+    border-left-color: #29B6F6;
+    box-shadow: 0 2px 14px rgba(41, 182, 246, 0.28) !important;
+}
+
+.food-item-card.status-cooking {
+    border-left-color: #FFA726;
+    box-shadow: 0 2px 14px rgba(255, 167, 38, 0.32) !important;
+}
+
+.food-item-card.status-ready {
+    border-left-color: #66BB6A;
+    background-color: rgba(102, 187, 106, 0.07) !important;
+}
+
+/* -- Status chip pulse ------------------------------------------------------ */
+@keyframes statusPulse {
+    0%   { transform: scale(1);    opacity: 1; }
+    50%  { transform: scale(1.07); opacity: 0.82; }
+    100% { transform: scale(1);    opacity: 1; }
+}
+
+.status-chip-active {
+    animation: statusPulse 1.1s ease-in-out infinite;
+    display: inline-flex !important;
+}
+
+/* -- Completion pulse ------------------------------------------------------- */
+@keyframes completePulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.03); }
+    100% { transform: scale(1); }
+}
+
+/* -- Empty state placeholder ------------------------------------------------ */
+.empty-state {
+    border: 2px dashed #E0E0E0 !important;
+    border-radius: 12px !important;
+    background-color: transparent !important;
+}
+
+/* -- Blazor error UI -------------------------------------------------------- */
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}
+
+/* ── Multi-add preview rows ───────────────────────────────────────────────── */
+.multi-add-row {
+    border-radius: 8px;
+}
+
+.multi-add-valid {
+    background-color: rgba(102, 187, 106, 0.09);
+    border-left: 3px solid #66BB6A;
+}
+
+.multi-add-error {
+    background-color: rgba(244, 67, 54, 0.06);
+    border-left: 3px solid #F44336;
+}

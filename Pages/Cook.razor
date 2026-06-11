@@ -1,0 +1,397 @@
+@page "/cook"
+@implements IAsyncDisposable
+@inject MealStateService MealState
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IDialogService DialogService
+
+<PageTitle>Meal Timer — Cooking</PageTitle>
+
+@if (!MealState.ActiveMeal.FoodItems.Any())
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        No food items found. Please go back and add some dishes first.
+    </MudAlert>
+    <MudButton Color="Color.Primary" Variant="Variant.Outlined"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="@(() => Nav.NavigateTo("/"))">
+        Back to Setup
+    </MudButton>
+}
+else
+{
+    <!-- ── Overall Meal Countdown ──────────────────────────────────── -->
+    <MudCard Elevation="4" Class="mb-5 timer-hero-card">
+        <MudCardContent Class="pa-5 text-center">
+            <MudText Typo="Typo.overline" Style="color: rgba(0,0,0,0.45); letter-spacing: 0.15em;">
+                @MealState.ActiveMeal.Name
+            </MudText>
+
+            @if (MealState.IsMealComplete)
+            {
+                <div class="meal-complete-text mt-1">🎉 Meal Ready! Time to Serve.</div>
+            }
+            else
+            {
+                <div class="main-timer-display mt-1">@FormatTime(MealState.RemainingSeconds)</div>
+                <MudText Typo="Typo.caption" Style="color: rgba(0,0,0,0.4);">remaining</MudText>
+            }
+        </MudCardContent>
+
+        <MudCardActions Class="justify-center gap-2 pb-5">
+            @if (!MealState.IsTimerStarted)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.PlayArrow"
+                           OnClick="OnStart">
+                    Start
+                </MudButton>
+            }
+            else if (!MealState.IsMealComplete)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="@(MealState.IsTimerRunning ? Color.Warning : Color.Success)"
+                           Size="Size.Large"
+                           StartIcon="@(MealState.IsTimerRunning
+                               ? Icons.Material.Filled.Pause
+                               : Icons.Material.Filled.PlayArrow)"
+                           OnClick="OnTogglePause">
+                    @(MealState.IsTimerRunning ? "Pause" : "Resume")
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Error"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.RestartAlt"
+                           OnClick="OnReset">
+                    Reset
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.RestartAlt"
+                           OnClick="OnReset">
+                    Cook Again
+                </MudButton>
+            }
+        </MudCardActions>
+    </MudCard>
+
+    <!-- ── Food Item Cards ────────────────────────────────────────── -->
+    <MudText Typo="Typo.overline"
+             Style="color: rgba(0,0,0,0.5); letter-spacing: 0.15em; font-weight: 600;"
+             Class="mb-2">
+        FOOD ITEMS
+    </MudText>
+
+    @foreach (var item in MealState.ActiveMeal.FoodItems.OrderByDescending(f => f.TotalTimeMinutes))
+    {
+        var status = MealState.GetItemStatus(item);
+        var schedule = MealState.GetSchedule(item);
+        var countdown = GetCountdownText(item, status, schedule);
+        var countdownLabel = GetCountdownLabel(status);
+
+        <MudCard Elevation="2" Class="@($"{GetCardClass(status)} mb-3")">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-start justify-space-between">
+
+                    <!-- Left: name, device, badge, progress -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="d-flex align-center flex-wrap gap-1 mb-1">
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@item.Name</MudText>
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="@GetStatusColor(status)"
+                                     Class="@(IsActiveStatus(status) ? "status-chip-active" : "")"
+                                     Label="true">
+                                @GetStatusLabel(status)
+                            </MudChip>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(item.CookingDevice)
+                             || !string.IsNullOrWhiteSpace(item.Temperature))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @(string.Join(" · ",
+                                    new[] { item.CookingDevice, item.Temperature }
+                                        .Where(s => !string.IsNullOrWhiteSpace(s))))
+                            </MudText>
+                        }
+
+                        @if (status == FoodItemStatus.Preparing || status == FoodItemStatus.Cooking)
+                        {
+                            <MudProgressLinear Color="@GetStatusColor(status)"
+                                               Value="@GetProgressPercent(item, status, schedule)"
+                                               Rounded="true"
+                                               Class="mt-2"
+                                               Style="height: 6px;" />
+                        }
+                    </div>
+
+                    <!-- Right: countdown -->
+                    @if (countdown is not null)
+                    {
+                        <div class="text-right ml-3" style="flex-shrink: 0;">
+                            <div class="item-timer">@countdown</div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@countdownLabel</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Ready checkmark -->
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                 Color="Color.Success"
+                                 Size="Size.Large"
+                                 Class="ml-3" Style="flex-shrink: 0;" />
+                    }
+                </div>
+            </MudCardContent>
+        </MudCard>
+    }
+
+    <!-- ── Back Button ────────────────────────────────────────────── -->
+    <div class="mt-5 mb-6">
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="OnBack">
+            Back to Setup
+        </MudButton>
+    </div>
+}
+
+@code {
+    private PeriodicTimer? _periodicTimer;
+    private CancellationTokenSource? _cts;
+    private Task? _timerTask;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    protected override void OnInitialized()
+    {
+        // Re-attach the timer loop if the user navigated away and back
+        if (MealState.IsTimerRunning)
+            StartTimerLoop();
+    }
+
+    // ── Controls ──────────────────────────────────────────────────────────────
+
+    private async Task OnStart()
+    {
+        MealState.IsTimerStarted = true;
+        MealState.IsTimerRunning = true;
+        // Fire phase notifications for items whose start offset is 0
+        await CheckAndNotifyPhaseChangesAsync();
+        StartTimerLoop();
+        StateHasChanged();
+    }
+
+    private void OnTogglePause()
+    {
+        MealState.IsTimerRunning = !MealState.IsTimerRunning;
+    }
+
+    private void OnReset()
+    {
+        StopTimerLoop();
+        MealState.ResetCooking();
+        StateHasChanged();
+    }
+
+    private async Task OnBack()
+    {
+        if (MealState.IsTimerStarted && !MealState.IsMealComplete)
+        {
+            var confirmed = await DialogService.ShowMessageBox(
+                "Leave cooking screen?",
+                "The timer will be reset if you go back. Continue?",
+                yesText: "Yes, go back",
+                cancelText: "Stay here");
+
+            if (confirmed != true) return;
+        }
+
+        StopTimerLoop();
+        MealState.ResetCooking();
+        Nav.NavigateTo("/");
+    }
+
+    // ── Timer Loop ────────────────────────────────────────────────────────────
+
+    private void StartTimerLoop()
+    {
+        StopTimerLoop();
+        _cts = new CancellationTokenSource();
+        _timerTask = RunTimerAsync(_cts.Token);
+    }
+
+    private void StopTimerLoop()
+    {
+        _cts?.Cancel();
+        _periodicTimer?.Dispose();
+        _periodicTimer = null;
+        _cts?.Dispose();
+        _cts = null;
+    }
+
+    private async Task RunTimerAsync(CancellationToken token)
+    {
+        _periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await _periodicTimer.WaitForNextTickAsync(token))
+            {
+                if (!MealState.IsTimerRunning) continue;
+
+                MealState.ElapsedSeconds++;
+                await CheckAndNotifyPhaseChangesAsync();
+
+                if (MealState.ElapsedSeconds >= MealState.MealTotalSeconds)
+                {
+                    MealState.IsTimerRunning = false;
+                    MealState.IsMealComplete = true;
+                    await PlayBeepAsync(880, 1.0); // Completion fanfare
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { /* Normal shutdown */ }
+    }
+
+    // ── Phase Change Notifications ────────────────────────────────────────────
+
+    private async Task CheckAndNotifyPhaseChangesAsync()
+    {
+        foreach (var item in MealState.ActiveMeal.FoodItems)
+        {
+            var schedule = MealState.GetSchedule(item);
+
+            // Prep start
+            if (schedule.PrepStartOffsetSeconds.HasValue
+                && MealState.ElapsedSeconds == schedule.PrepStartOffsetSeconds.Value
+                && !MealState.PrepAlertsSent.Contains(item.Id))
+            {
+                MealState.PrepAlertsSent.Add(item.Id);
+                await PlayBeepAsync(660, 0.5);
+            }
+
+            // Cook start
+            if (MealState.ElapsedSeconds == schedule.CookStartOffsetSeconds
+                && !MealState.CookAlertsSent.Contains(item.Id))
+            {
+                MealState.CookAlertsSent.Add(item.Id);
+                await PlayBeepAsync(880, 0.5);
+            }
+        }
+    }
+
+    private async Task PlayBeepAsync(double frequency, double duration)
+    {
+        try { await JS.InvokeVoidAsync("playBeep", frequency, duration); }
+        catch { /* Ignore audio failures */ }
+    }
+
+    // ── Display Helpers ───────────────────────────────────────────────────────
+
+    private static string FormatTime(int totalSeconds)
+    {
+        var m = totalSeconds / 60;
+        var s = totalSeconds % 60;
+        return $"{m:D2}:{s:D2}";
+    }
+
+    private static string GetCardClass(FoodItemStatus status) => status switch
+    {
+        FoodItemStatus.Preparing => "food-item-card status-preparing",
+        FoodItemStatus.Cooking   => "food-item-card status-cooking",
+        FoodItemStatus.Ready     => "food-item-card status-ready",
+        _                        => "food-item-card"
+    };
+
+    private static Color GetStatusColor(FoodItemStatus status) => status switch
+    {
+        FoodItemStatus.Preparing => Color.Info,
+        FoodItemStatus.Cooking   => Color.Warning,
+        FoodItemStatus.Ready     => Color.Success,
+        _                        => Color.Default
+    };
+
+    private static bool IsActiveStatus(FoodItemStatus status) =>
+        status is FoodItemStatus.Preparing or FoodItemStatus.Cooking;
+
+    private static string GetStatusLabel(FoodItemStatus status) => status switch
+    {
+        FoodItemStatus.Waiting   => "⏳ Waiting",
+        FoodItemStatus.Preparing => "⚡ Prepare Now!",
+        FoodItemStatus.Cooking   => "🔥 Start Cooking!",
+        FoodItemStatus.Ready     => "✓ Ready",
+        _                        => string.Empty
+    };
+
+    private string? GetCountdownText(FoodItem item, FoodItemStatus status, FoodItemSchedule schedule)
+    {
+        if (status == FoodItemStatus.Ready) return null;
+
+        if (!MealState.IsTimerStarted)
+            return FormatTime(item.TotalTimeMinutes * 60);
+
+        return status switch
+        {
+            FoodItemStatus.Waiting => item.PrepTimeMinutes.HasValue
+                ? FormatTime(Math.Max(0, schedule.PrepStartOffsetSeconds!.Value - MealState.ElapsedSeconds))
+                : FormatTime(Math.Max(0, schedule.CookStartOffsetSeconds - MealState.ElapsedSeconds)),
+
+            FoodItemStatus.Preparing =>
+                FormatTime(Math.Max(0, schedule.CookStartOffsetSeconds - MealState.ElapsedSeconds)),
+
+            FoodItemStatus.Cooking =>
+                FormatTime(Math.Max(0, schedule.DoneOffsetSeconds - MealState.ElapsedSeconds)),
+
+            _ => null
+        };
+    }
+
+    private string GetCountdownLabel(FoodItemStatus status)
+    {
+        if (!MealState.IsTimerStarted) return "total time";
+        return status switch
+        {
+            FoodItemStatus.Waiting   => "until start",
+            FoodItemStatus.Preparing => "prep remaining",
+            FoodItemStatus.Cooking   => "cook remaining",
+            _                        => string.Empty
+        };
+    }
+
+    private double GetProgressPercent(FoodItem item, FoodItemStatus status, FoodItemSchedule schedule) =>
+        status switch
+        {
+            FoodItemStatus.Preparing when item.PrepTimeMinutes is > 0 =>
+                Math.Min(100, (double)(MealState.ElapsedSeconds - schedule.PrepStartOffsetSeconds!.Value)
+                    / (item.PrepTimeMinutes.Value * 60) * 100),
+
+            FoodItemStatus.Cooking when item.CookTimeMinutes > 0 =>
+                Math.Min(100, (double)(MealState.ElapsedSeconds - schedule.CookStartOffsetSeconds)
+                    / (item.CookTimeMinutes * 60) * 100),
+
+            _ => 0
+        };
+
+    // ── Cleanup ───────────────────────────────────────────────────────────────
+
+    public async ValueTask DisposeAsync()
+    {
+        StopTimerLoop();
+        if (_timerTask is not null)
+        {
+            try { await _timerTask; }
+            catch (OperationCanceledException) { }
+        }
+    }
+}

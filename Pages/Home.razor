@@ -1,0 +1,153 @@
+﻿@page "/"
+@inject MealStateService MealState
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+
+<PageTitle>Meal Timer — Setup</PageTitle>
+
+<MudText Typo="Typo.h5" Color="Color.Primary" Class="mb-4 mt-1" Style="font-weight: 700;">
+    🍽️ Plan Your Meal
+</MudText>
+
+<!-- ── Meal Name ──────────────────────────────────────────────────── -->
+<MudCard Elevation="2" Class="mb-5">
+    <MudCardContent>
+        <MudTextField @bind-Value="MealState.ActiveMeal.Name"
+                      Label="Meal Name"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Restaurant"
+                      FullWidth="true" />
+    </MudCardContent>
+</MudCard>
+
+<!-- ── Food Items Header ──────────────────────────────────────────── -->
+<div class="d-flex justify-space-between align-center mb-3">
+    <MudText Typo="Typo.h6" Style="font-weight: 600;">Food Items</MudText>
+    <div class="d-flex gap-1">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.PlaylistAdd"
+                   OnClick="OpenMultiAddDialog">
+            Multi-Add
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Secondary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddItemDialog">
+            Add Item
+        </MudButton>
+    </div>
+</div>
+
+<!-- ── Empty State ────────────────────────────────────────────────── -->
+@if (!MealState.ActiveMeal.FoodItems.Any())
+{
+    <MudPaper Elevation="0" Class="pa-6 text-center empty-state mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.NoFood" Size="Size.Large" Style="color: #BDBDBD;" />
+        <MudText Typo="Typo.body1" Class="mt-2" Style="color: #9E9E9E;">
+            No food items yet.<br />Tap <strong>Add Item</strong> to get started.
+        </MudText>
+    </MudPaper>
+}
+
+<!-- ── Food Item Cards ────────────────────────────────────────────── -->
+@foreach (var item in MealState.ActiveMeal.FoodItems)
+{
+    <MudCard Elevation="2" Class="mb-3 food-item-card">
+        <MudCardContent Class="pa-3">
+            <div class="d-flex align-start justify-space-between">
+                <div style="flex: 1; min-width: 0;">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@item.Name</MudText>
+
+                    @if (!string.IsNullOrWhiteSpace(item.CookingDevice) || !string.IsNullOrWhiteSpace(item.Temperature))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">
+                            @(string.Join(" · ", new[] { item.CookingDevice, item.Temperature }
+                                .Where(s => !string.IsNullOrWhiteSpace(s))))
+                        </MudText>
+                    }
+
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        @if (item.PrepTimeMinutes.HasValue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                                     Icon="@Icons.Material.Filled.Timer" Label="true">
+                                Prep @item.PrepTimeMinutes min
+                            </MudChip>
+                        }
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                                 Icon="@Icons.Material.Filled.LocalFireDepartment" Label="true">
+                            Cook @item.CookTimeMinutes min
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success"
+                                 Icon="@Icons.Material.Filled.Schedule" Label="true">
+                            Total @item.TotalTimeMinutes min
+                        </MudChip>
+                    </div>
+                </div>
+
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               Class="ml-1"
+                               OnClick="@(() => RemoveItem(item))"
+                               aria-label="Remove item" />
+            </div>
+        </MudCardContent>
+    </MudCard>
+}
+
+<!-- ── Start Cooking ──────────────────────────────────────────────── -->
+<div class="mt-5">
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               Size="Size.Large"
+               StartIcon="@Icons.Material.Filled.PlayArrow"
+               Disabled="@(!MealState.ActiveMeal.FoodItems.Any())"
+               OnClick="StartCooking">
+        Start Cooking
+    </MudButton>
+</div>
+
+@code {
+    private void RemoveItem(FoodItem item) =>
+        MealState.ActiveMeal.FoodItems.Remove(item);
+
+    private async Task OpenAddItemDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        };
+        var dialog = await DialogService.ShowAsync<AddFoodItemDialog>("Add Food Item", options);
+        await dialog.Result;
+    }
+
+    private async Task OpenMultiAddDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        };
+        var dialog = await DialogService.ShowAsync<MultiAddDialog>("Add Multiple Items", options);
+        await dialog.Result;
+    }
+
+    private void StartCooking()
+    {
+        MealState.ResetCooking();
+        Nav.NavigateTo("/cook");
+    }
+}
+
+Welcome to your new app.

@@ -1,0 +1,77 @@
+@inject MealStateService MealState
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudTextField @bind-Value="_item.Name"
+                          Label="Food Name *"
+                          Required="true"
+                          RequiredError="Name is required"
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Class="mb-3"
+                          Immediate="true" />
+
+            <MudGrid Spacing="2" Class="mb-3">
+                <MudItem xs="6">
+                    <MudNumericField T="int"
+                                     @bind-Value="_item.CookTimeMinutes"
+                                     Label="Cook Time (min) *"
+                                     Variant="Variant.Outlined"
+                                     FullWidth="true"
+                                     Min="1"
+                                     Validation="@(new Func<int, string?>(v => v < 1 ? "Min 1 minute" : null))" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField T="int?"
+                                     @bind-Value="_item.PrepTimeMinutes"
+                                     Label="Prep Time (min)"
+                                     Placeholder="Optional"
+                                     Variant="Variant.Outlined"
+                                     FullWidth="true"
+                                     Min="0" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField @bind-Value="_item.CookingDevice"
+                          Label="Cooking Device"
+                          Placeholder="e.g. Oven, Hob, Grill"
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="_item.Temperature"
+                          Label="Temperature / Heat Setting"
+                          Placeholder="e.g. 180°C, Medium Heat"
+                          Variant="Variant.Outlined"
+                          FullWidth="true" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton OnClick="Submit"
+                   Color="Color.Primary"
+                   Variant="Variant.Filled">
+            Add Item
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private FoodItem _item = new();
+    private MudForm _form = null!;
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (_form.IsValid)
+        {
+            MealState.ActiveMeal.FoodItems.Add(_item);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

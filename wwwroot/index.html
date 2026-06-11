@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Meal Timer — Cooking Scheduler</title>
+    <base href="/" />
+    <!-- MudBlazor fonts and stylesheet -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <!-- App custom styles -->
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="MealTimer.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <div style="display:flex;justify-content:center;align-items:center;height:100vh;background:#FFF8F1;">
+            <div style="text-align:center;">
+                <div style="font-size:2rem;">🍽️</div>
+                <div style="font-family:Roboto,sans-serif;color:#E65100;margin-top:0.5rem;">
+                    Loading Meal Timer…
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+
+    <!-- MudBlazor JS must come before blazor.webassembly.js -->
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="js/audioInterop.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>

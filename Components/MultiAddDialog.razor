@@ -1,0 +1,185 @@
+@inject MealStateService MealState
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PlaylistAdd" Class="mr-1" />
+            Add Multiple Items
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+            <b>Format</b> (one item per line):<br />
+            <code>Name, CookMins, [PrepMins], [Device], [Temperature]</code><br />
+            PrepMins is auto-detected — include it only if the 3rd field is a whole number.
+        </MudAlert>
+
+        <MudTextField @bind-Value="_rawText"
+                      Label="Paste items here (one per line)"
+                      Lines="7"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Immediate="true"
+                      Placeholder="Battered Fish, 40, 10, Oven, 180&#10;Chips, 20, Oven, 180&#10;Broccoli, 5, Hob"
+                      Class="mb-3" />
+
+        @if (ParsedLines.Any())
+        {
+            var validCount = ParsedLines.Count(p => p.IsValid);
+            var errorCount = ParsedLines.Count(p => !p.IsValid);
+
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudText Typo="Typo.subtitle2">Preview</MudText>
+                @if (validCount > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Label="true">
+                        @validCount valid
+                    </MudChip>
+                }
+                @if (errorCount > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Label="true">
+                        @errorCount error@(errorCount > 1 ? "s" : "")
+                    </MudChip>
+                }
+            </div>
+
+            @foreach (var line in ParsedLines)
+            {
+                @if (line.IsValid && line.Item is not null)
+                {
+                    <div class="multi-add-row multi-add-valid d-flex align-center flex-wrap gap-1 mb-1 pa-2">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                 Color="Color.Success" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Style="font-weight: 600; margin-right: 2px;">
+                            @line.Item!.Name
+                        </MudText>
+                        @if (line.Item.PrepTimeMinutes.HasValue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Label="true">
+                                Prep @line.Item.PrepTimeMinutes min
+                            </MudChip>
+                        }
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Label="true">
+                            Cook @line.Item.CookTimeMinutes min
+                        </MudChip>
+                        @if (!string.IsNullOrWhiteSpace(line.Item.CookingDevice))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Label="true">
+                                @line.Item.CookingDevice
+                            </MudChip>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(line.Item.Temperature))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Label="true">
+                                @line.Item.Temperature
+                            </MudChip>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="multi-add-row multi-add-error d-flex align-center gap-2 mb-1 pa-2">
+                        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline"
+                                 Color="Color.Error" Size="Size.Small" Style="flex-shrink:0;" />
+                        <div>
+                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-error); font-weight: 600;">
+                                @line.Error
+                            </MudText>
+                            <MudText Typo="Typo.caption" Style="color: rgba(0,0,0,0.45); font-style: italic;">
+                                "@line.RawLine"
+                            </MudText>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!ParsedLines.Any(p => p.IsValid))"
+                   OnClick="AddValid">
+            Add @(ParsedLines.Count(p => p.IsValid)) Item@(ParsedLines.Count(p => p.IsValid) != 1 ? "s" : "")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _rawText = string.Empty;
+
+    // Recomputed on every render triggered by Immediate two-way binding
+    private IReadOnlyList<ParsedLine> ParsedLines =>
+        _rawText
+            .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(ParseLine)
+            .ToList();
+
+    private void AddValid()
+    {
+        foreach (var p in ParsedLines.Where(p => p.IsValid))
+            MealState.ActiveMeal.FoodItems.Add(p.Item!);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    // ── Parsing ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Format: Name, CookMins[, PrepMins][, Device][, Temperature]
+    ///
+    /// The 3rd field is treated as PrepMins ONLY when it parses as a non-negative
+    /// whole number; otherwise it is treated as the cooking device name.
+    /// This lets both 5-field (with prep) and 4/3-field (without prep) lines work.
+    /// </summary>
+    private static ParsedLine ParseLine(string line)
+    {
+        var raw = line.Trim();
+
+        var parts = raw.Split(',').Select(p => p.Trim()).ToArray();
+
+        if (parts.Length < 2)
+            return new ParsedLine(raw, null, "Need at least: Name, CookMins");
+
+        var name = parts[0];
+        if (string.IsNullOrWhiteSpace(name))
+            return new ParsedLine(raw, null, "Name cannot be empty");
+
+        if (!int.TryParse(parts[1], out int cookTime) || cookTime < 1)
+            return new ParsedLine(raw, null, $"\"{parts[1]}\" is not a valid cook time (must be a whole number ≥ 1)");
+
+        int? prepTime = null;
+        string device = string.Empty;
+        string temperature = string.Empty;
+
+        int idx = 2;
+
+        // If field[2] is a non-negative integer, interpret it as prep time
+        if (idx < parts.Length && int.TryParse(parts[idx], out int prep) && prep >= 0)
+        {
+            prepTime = prep > 0 ? prep : (int?)null;
+            idx++;
+        }
+
+        if (idx < parts.Length) device      = parts[idx++];
+        if (idx < parts.Length) temperature = parts[idx];
+
+        return new ParsedLine(raw, new FoodItem
+        {
+            Name            = name,
+            CookTimeMinutes = cookTime,
+            PrepTimeMinutes = prepTime,
+            CookingDevice   = device,
+            Temperature     = temperature
+        }, null);
+    }
+
+    private record ParsedLine(string RawLine, FoodItem? Item, string? Error)
+    {
+        public bool IsValid => Item is not null;
+    }
+}
