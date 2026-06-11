@@ -6,6 +6,11 @@ html, body {
     padding: 0;
 }
 
+/* Taller AppBar offset */
+.mud-main-content {
+    padding-top: 68px !important;
+}
+
 /* -- Main countdown clock --------------------------------------------------- */
 .main-timer-display {
     font-size: clamp(3.5rem, 16vw, 5.5rem);
